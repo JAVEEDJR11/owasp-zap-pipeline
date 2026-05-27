@@ -12,3 +12,4 @@ jobs:
         uses: zaproxy/action-baseline@v0.15.0
         with:
           target: 'https://demo.owasp-juice.shop'
+          allow_issue_writing: false
