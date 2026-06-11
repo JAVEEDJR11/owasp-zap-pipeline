@@ -11,5 +11,5 @@ jobs:
       - name: ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.15.0
         with:
-          target: 'https://demo.owasp-juice.shop'
+          target: 'https://www.changepond.com/'
           allow_issue_writing: false
