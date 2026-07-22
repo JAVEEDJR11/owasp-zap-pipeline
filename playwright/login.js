@@ -1,37 +1,51 @@
 const { chromium } = require('playwright');
 
 (async () => {
+  const browser = await chromium.launch({
+    headless: true
+  });
 
-    const browser = await chromium.launch({
-        headless: true
-    });
+  const context = await browser.newContext();
 
-    const page = await browser.newPage({
+  const page = await context.newPage();
 
-        proxy: {
-            server: "http://127.0.0.1:8080"
-        }
+  // Open Juice Shop
+  await page.goto('https://demo.owasp-juice.shop', {
+    waitUntil: 'networkidle'
+  });
 
-    });
+  // Dismiss welcome dialog if it appears
+  try {
+    await page.getByRole('button', { name: /dismiss/i }).click({ timeout: 5000 });
+  } catch (e) {
+    console.log("No welcome dialog");
+  }
 
-    await page.goto("https://ess.changepond.com/#/");
+  // Open Account menu
+  await page.getByRole('button', { name: /account/i }).click();
 
-    await page.getByRole('textbox', {
-        name: 'Employee ID'
-    }).fill(process.env.ESS_USERNAME);
+  // Click Login
+  await page.getByRole('menuitem', { name: /login/i }).click();
 
-    await page.locator('input[type="password"]').fill(process.env.ESS_PASSWORD);
+  // Enter Email
+  await page.getByLabel(/email/i).fill(process.env.APP_USERNAME);
 
-    await page.getByRole('button', {
-        name: 'Login'
-    }).click();
+  // Enter Password
+  await page.getByLabel(/password/i).fill(process.env.APP_PASSWORD);
 
-    await page.waitForURL('**/dashboard');
+  // Click Login
+  await page.getByRole('button', { name: /^log in$/i }).click();
 
-    await page.screenshot({
-        path: 'dashboard.png'
-    });
+  // Wait for login
+  await page.waitForLoadState('networkidle');
 
-    await browser.close();
+  // Verify login
+  await page.screenshot({
+    path: 'juice-shop-login.png',
+    fullPage: true
+  });
 
+  console.log("Login Successful");
+
+  await browser.close();
 })();
