@@ -5,7 +5,6 @@ on:
 
 jobs:
   login-test:
-
     runs-on: ubuntu-latest
 
     env:
@@ -13,7 +12,6 @@ jobs:
       APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
 
     steps:
-
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -29,8 +27,11 @@ jobs:
       - name: Run Login Script
         run: node playwright/login.js
 
-      - name: Upload Screenshot
+      - name: Upload Screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: login-screenshot
-          path: juice-shop-login.png
+          name: playwright-output
+          path: |
+            juice-shop-login.png
+            error.png
