@@ -1,4 +1,4 @@
-name: OWASP ZAP Security Scan
+name: OWASP ZAP Authenticated Scan
 
 on:
   workflow_dispatch:
@@ -7,9 +7,70 @@ jobs:
   zap_scan:
     runs-on: ubuntu-latest
 
+    env:
+      ESS_USERNAME: ${{ secrets.ESS_USERNAME }}
+      ESS_PASSWORD: ${{ secrets.ESS_PASSWORD }}
+
     steps:
-      - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.15.0
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          target: 'https://www.changepond.com/'
-          allow_issue_writing: false
+          node-version: 20
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install --with-deps
+
+      - name: Start OWASP ZAP
+        run: |
+          docker run -d \
+            --name zap \
+            -u zap \
+            -p 8080:8080 \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap.sh -daemon \
+            -host 0.0.0.0 \
+            -port 8080 \
+            -config api.disablekey=true
+
+      - name: Wait for ZAP
+        run: sleep 20
+
+      - name: Verify ZAP is Running
+        run: curl http://localhost:8080
+
+      - name: Login using Playwright
+        run: node playwright/login.js
+
+      - name: Spider
+        run: |
+          curl "http://localhost:8080/JSON/spider/action/scan/?url=https://ess.changepond.com"
+
+      - name: AJAX Spider
+        run: |
+          curl "http://localhost:8080/JSON/ajaxSpider/action/scan/?url=https://ess.changepond.com"
+
+      - name: Active Scan
+        run: |
+          curl "http://localhost:8080/JSON/ascan/action/scan/?url=https://ess.changepond.com"
+
+      - name: Generate HTML Report
+        run: |
+          docker exec zap zap.sh \
+            -cmd \
+            -quickout /zap/wrk/report.html
+
+      - name: Copy Report
+        run: |
+          docker cp zap:/zap/wrk/report.html .
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: report.html
