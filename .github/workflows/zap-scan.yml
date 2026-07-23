@@ -1,55 +1,109 @@
-name: Playwright Login Test
+name: OWASP ZAP Authenticated Scan
 
 on:
   workflow_dispatch:
 
 jobs:
-  login-test:
+
+  zap-authenticated-scan:
+
     runs-on: ubuntu-latest
 
-    env:
-      APP_USERNAME: ${{ secrets.APP_USERNAME }}
-      APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
 
     steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
+    - name: Checkout Repository
+      uses: actions/checkout@v4
 
-      - name: Install Playwright
-        run: |
-          npm init -y
-          npm install playwright
-          npx playwright install --with-deps
 
-      - name: Start OWASP ZAP
-        run: |
-          docker run -d \
-            --name zap \
-            -p 8090:8080 \
-            ghcr.io/zaproxy/zaproxy:stable \
-            zap.sh -daemon \
-            -host 0.0.0.0 \
-            -port 8080 \
-            -config api.disablekey=true
+    - name: Start Juice Shop
+      run: |
 
-      - name: Wait for ZAP
-        run: sleep 30
+        docker pull bkimminich/juice-shop
 
-      - name: Verify ZAP
-        run: |
-          curl http://localhost:8090/JSON/core/view/version/
+        docker run -d \
+          --name juice-shop \
+          -p 3000:3000 \
+          bkimminich/juice-shop
 
-      - name: Run Login Script
-        run: node playwright/login.js
 
-      - name: Upload Screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-output
-          path: |
-            juice-shop-login.png
-            error.png
+        echo "Waiting for application..."
+        sleep 30
+
+
+        curl http://localhost:3000
+
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+
+
+    - name: Install Playwright
+      run: |
+
+        npm init -y
+
+        npm install playwright
+
+        npx playwright install chromium
+
+
+
+    - name: Login using Playwright
+      env:
+
+        APP_USERNAME: ${{ secrets.APP_USERNAME }}
+
+        APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+
+      run: |
+
+        node playwright/login.js
+
+
+
+    - name: Start OWASP ZAP Container
+      run: |
+
+
+        docker pull ghcr.io/zaproxy/zaproxy:stable
+
+
+        docker run -d \
+          --name zap \
+          -p 8080:8080 \
+          --network host \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap.sh \
+          -daemon \
+          -host 0.0.0.0 \
+          -port 8080 \
+          -config api.disablekey=true
+
+
+
+        sleep 20
+
+
+
+    - name: Run ZAP Authenticated Scan
+      run: |
+
+
+        docker exec zap \
+        zap-full-scan.py \
+        -t http://localhost:3000 \
+        -r zap-report.html
+
+
+
+    - name: Upload ZAP Report
+      uses: actions/upload-artifact@v4
+      with:
+
+        name: zap-security-report
+
+        path: zap-report.html
