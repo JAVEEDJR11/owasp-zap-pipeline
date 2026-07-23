@@ -1,13 +1,15 @@
 const { chromium } = require('playwright');
 
 (async () => {
+
   let browser;
 
   try {
-    console.log("Starting browser through OWASP ZAP proxy...");
+
+    console.log("Launching browser through ZAP Proxy...");
 
     browser = await chromium.launch({
-      headless: false, // Change to true in GitHub Actions
+      headless: true,
       proxy: {
         server: "http://127.0.0.1:8090"
       }
@@ -25,7 +27,7 @@ const { chromium } = require('playwright');
 
     console.log("Opening Juice Shop...");
 
-    await page.goto("http://localhost:3000", {
+    await page.goto("https://demo.owasp-juice.shop", {
       waitUntil: "domcontentloaded",
       timeout: 60000
     });
@@ -34,126 +36,95 @@ const { chromium } = require('playwright');
 
     // Close Welcome Banner
     try {
-      console.log("Closing Welcome Banner...");
-      await page.locator("button[aria-label='Close Welcome Banner']").click({
-        timeout: 5000
-      });
-    } catch {
-      console.log("Welcome banner not displayed.");
-    }
+      await page.locator("button[aria-label='Close Welcome Banner']").click();
+    } catch {}
 
-    // Close Cookie Popup
+    // Close Cookie Banner
     try {
-      console.log("Closing Cookie Popup...");
-      await page.locator("button[aria-label='dismiss cookie message']").click({
-        timeout: 5000
-      });
-    } catch {
-      console.log("Cookie popup not displayed.");
-    }
+      await page.locator("button[aria-label='dismiss cookie message']").click();
+    } catch {}
 
-    console.log("Opening Login page...");
+    console.log("Opening Login Page...");
 
-    await page.locator("#navbarAccount").click();
-    await page.locator("#navbarLoginButton").click();
+    await page.click("#navbarAccount");
+    await page.click("#navbarLoginButton");
 
-    console.log("Entering credentials...");
+    console.log("Logging in...");
 
     await page.fill("#email", process.env.APP_USERNAME);
     await page.fill("#password", process.env.APP_PASSWORD);
-
-    console.log("Logging in...");
 
     await page.click("#loginButton");
 
     await page.waitForTimeout(5000);
 
-    console.log("Login successful.");
+    console.log("Browsing authenticated pages...");
 
-    // Visit authenticated pages so ZAP can discover them
     const pages = [
-      "http://localhost:3000/#/profile",
-      "http://localhost:3000/#/wallet",
-      "http://localhost:3000/#/order-history",
-      "http://localhost:3000/#/basket",
-      "http://localhost:3000/#/contact",
-      "http://localhost:3000/#/photo-wall",
-      "http://localhost:3000/#/search?q=apple",
-      "http://localhost:3000/#/search?q=juice",
-      "http://localhost:3000/#/search?q=banana"
+      "https://demo.owasp-juice.shop/#/profile",
+      "https://demo.owasp-juice.shop/#/wallet",
+      "https://demo.owasp-juice.shop/#/order-history",
+      "https://demo.owasp-juice.shop/#/basket",
+      "https://demo.owasp-juice.shop/#/contact",
+      "https://demo.owasp-juice.shop/#/photo-wall",
+      "https://demo.owasp-juice.shop/#/search?q=apple",
+      "https://demo.owasp-juice.shop/#/search?q=banana",
+      "https://demo.owasp-juice.shop/#/search?q=juice"
     ];
 
     for (const url of pages) {
-      console.log(`Visiting ${url}`);
+
+      console.log(`Opening ${url}`);
 
       try {
+
         await page.goto(url, {
           waitUntil: "domcontentloaded",
           timeout: 30000
         });
 
-        await page.waitForTimeout(2500);
-      } catch (e) {
-        console.log(`Could not load ${url}`);
-      }
+        await page.waitForTimeout(2000);
+
+      } catch {}
+
     }
-
-    console.log("Scrolling pages...");
-
-    await page.evaluate(async () => {
-      await new Promise(resolve => {
-        let totalHeight = 0;
-        const distance = 500;
-
-        const timer = setInterval(() => {
-          window.scrollBy(0, distance);
-          totalHeight += distance;
-
-          if (totalHeight >= document.body.scrollHeight) {
-            clearInterval(timer);
-            resolve();
-          }
-        }, 200);
-      });
-    });
-
-    await page.waitForTimeout(3000);
-
-    console.log("Taking screenshot...");
 
     await page.screenshot({
       path: "juice-shop-login.png",
       fullPage: true
     });
 
-    console.log("Authenticated browsing completed.");
+    console.log("Waiting for ZAP to capture traffic...");
 
-    console.log("Waiting 20 seconds for ZAP to finish recording requests...");
+    await page.waitForTimeout(15000);
 
-    await page.waitForTimeout(20000);
+    console.log("Completed.");
 
-    console.log("Finished.");
+  }
 
-  } catch (err) {
+  catch (err) {
 
     console.error(err);
 
     try {
+
       const page = browser.contexts()[0].pages()[0];
 
       await page.screenshot({
         path: "error.png",
         fullPage: true
       });
+
     } catch {}
 
     process.exit(1);
 
-  } finally {
+  }
 
-    if (browser) {
+  finally {
+
+    if (browser)
       await browser.close();
-    }
 
   }
 
