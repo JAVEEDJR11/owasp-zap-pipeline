@@ -1,74 +1,74 @@
-name: OWASP ZAP Full Scan POC
+name: OWASP ZAP Authenticated Scan
+
 
 on:
+
   workflow_dispatch:
+
 
 
 jobs:
 
-  zap-full-scan:
+
+  zap-scan:
+
 
     runs-on: ubuntu-latest
 
 
     steps:
 
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+
+    - name: Checkout
+      uses: actions/checkout@v4
 
 
 
-      # Start Juice Shop
+    - name: Start Juice Shop
+      run: |
 
-      - name: Start Juice Shop
-        run: |
-
-          docker pull bkimminich/juice-shop
-
-
-          docker run -d \
-            --name juice-shop \
-            -p 3000:3000 \
-            bkimminich/juice-shop
+        docker run -d \
+          --name juice-shop \
+          -p 3000:3000 \
+          bkimminich/juice-shop
 
 
-          echo "Waiting for Juice Shop..."
-
-          sleep 30
+        sleep 30
 
 
-          curl -I http://localhost:3000
+        curl http://localhost:3000
 
 
 
-      # Start ZAP Full Scan
+    - name: Run ZAP Authenticated Scan
 
-      - name: Run OWASP ZAP Full Scan
-        run: |
+      env:
 
-          mkdir -p zap-report
+        APP_USERNAME: ${{ secrets.APP_USERNAME }}
 
-
-          docker run --rm \
-            --network host \
-            -v ${{ github.workspace }}/zap-report:/zap/wrk \
-            ghcr.io/zaproxy/zaproxy:stable \
-            zap-full-scan.py \
-            -t http://localhost:3000 \
-            -r /zap/wrk/zap-report.html \
-            -J /zap/wrk/zap-report.json \
-            -x /zap/wrk/zap-report.xml \
-            -I
+        APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
 
 
+      run: |
 
-      # Upload Report
 
-      - name: Upload ZAP Reports
-        uses: actions/upload-artifact@v4
+        docker run --rm \
+          --network host \
+          -v ${{ github.workspace }}:/zap/wrk \
+          -e APP_USERNAME \
+          -e APP_PASSWORD \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap.sh \
+          -autorun /zap/wrk/zap.yaml
 
-        with:
 
-          name: zap-full-scan-report
 
-          path: zap-report/
+    - name: Upload ZAP Report
+
+      uses: actions/upload-artifact@v4
+
+      with:
+
+        name: zap-auth-report
+
+        path: zap-auth-report.html
