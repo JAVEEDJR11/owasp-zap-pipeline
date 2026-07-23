@@ -1,25 +1,33 @@
-name: OWASP ZAP Authenticated Scan
+name: OWASP ZAP Authenticated POC Scan
 
 on:
   workflow_dispatch:
 
+
 jobs:
 
-  zap-authenticated-scan:
+  zap-security-scan:
 
     runs-on: ubuntu-latest
 
 
     steps:
 
+
     - name: Checkout Repository
       uses: actions/checkout@v4
 
 
-    - name: Start Juice Shop
+
+    # -----------------------------
+    # Start OWASP Juice Shop
+    # -----------------------------
+
+    - name: Start Juice Shop Container
       run: |
 
         docker pull bkimminich/juice-shop
+
 
         docker run -d \
           --name juice-shop \
@@ -27,15 +35,23 @@ jobs:
           bkimminich/juice-shop
 
 
-        echo "Waiting for application..."
+        echo "Waiting for Juice Shop..."
+
         sleep 30
 
 
         curl http://localhost:3000
 
 
-    - name: Setup Node
+
+
+    # -----------------------------
+    # Setup Node + Playwright
+    # -----------------------------
+
+    - name: Setup Node.js
       uses: actions/setup-node@v4
+
       with:
         node-version: 20
 
@@ -52,6 +68,11 @@ jobs:
 
 
 
+
+    # -----------------------------
+    # Authenticate Application
+    # -----------------------------
+
     - name: Login using Playwright
       env:
 
@@ -65,6 +86,23 @@ jobs:
 
 
 
+
+    # Check Auth File
+
+    - name: Verify Authentication File
+      run: |
+
+        ls -la
+
+        cat auth.json
+
+
+
+
+    # -----------------------------
+    # Start OWASP ZAP
+    # -----------------------------
+
     - name: Start OWASP ZAP Container
       run: |
 
@@ -72,10 +110,11 @@ jobs:
         docker pull ghcr.io/zaproxy/zaproxy:stable
 
 
+
         docker run -d \
           --name zap \
-          -p 8080:8080 \
           --network host \
+          -v ${{ github.workspace }}:/zap/wrk \
           ghcr.io/zaproxy/zaproxy:stable \
           zap.sh \
           -daemon \
@@ -85,25 +124,38 @@ jobs:
 
 
 
-        sleep 20
+        echo "Waiting for ZAP..."
+
+        sleep 30
 
 
 
-    - name: Run ZAP Authenticated Scan
+    # -----------------------------
+    # Run ZAP Scan
+    # -----------------------------
+
+    - name="Run OWASP ZAP Scan"
       run: |
 
 
         docker exec zap \
         zap-full-scan.py \
         -t http://localhost:3000 \
-        -r zap-report.html
+        -r /zap/wrk/zap-report.html \
+        -I
 
 
 
-    - name: Upload ZAP Report
+    # -----------------------------
+    # Upload Report
+    # -----------------------------
+
+    - name: Upload ZAP HTML Report
+
       uses: actions/upload-artifact@v4
+
       with:
 
-        name: zap-security-report
+        name: zap-authenticated-report
 
         path: zap-report.html
