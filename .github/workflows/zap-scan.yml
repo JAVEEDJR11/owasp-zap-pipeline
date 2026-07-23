@@ -3,159 +3,150 @@ name: OWASP ZAP Authenticated POC Scan
 on:
   workflow_dispatch:
 
-
 jobs:
 
   zap-security-scan:
 
     runs-on: ubuntu-latest
 
-
     steps:
 
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Checkout Repository
-      uses: actions/checkout@v4
 
+      # -----------------------------
+      # Start Juice Shop
+      # -----------------------------
 
+      - name: Start Juice Shop
+        run: |
 
-    # -----------------------------
-    # Start OWASP Juice Shop
-    # -----------------------------
+          docker pull bkimminich/juice-shop
 
-    - name: Start Juice Shop Container
-      run: |
+          docker run -d \
+            --name juice-shop \
+            -p 3000:3000 \
+            bkimminich/juice-shop
 
-        docker pull bkimminich/juice-shop
 
+          echo "Waiting for Juice Shop..."
 
-        docker run -d \
-          --name juice-shop \
-          -p 3000:3000 \
-          bkimminich/juice-shop
+          sleep 30
 
 
-        echo "Waiting for Juice Shop..."
+          curl -I http://localhost:3000
 
-        sleep 30
 
 
-        curl http://localhost:3000
+      # -----------------------------
+      # Setup Node
+      # -----------------------------
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
 
+        with:
+          node-version: 20
 
 
-    # -----------------------------
-    # Setup Node + Playwright
-    # -----------------------------
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+      # -----------------------------
+      # Install Playwright
+      # -----------------------------
 
-      with:
-        node-version: 20
+      - name: Install Playwright
+        run: |
 
+          npm init -y
 
+          npm install playwright
 
-    - name: Install Playwright
-      run: |
+          npx playwright install chromium
 
-        npm init -y
 
-        npm install playwright
 
-        npx playwright install chromium
+      # -----------------------------
+      # Login Application
+      # -----------------------------
 
+      - name: Authenticate with Playwright
+        env:
 
+          APP_USERNAME: ${{ secrets.APP_USERNAME }}
 
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
 
-    # -----------------------------
-    # Authenticate Application
-    # -----------------------------
+        run: |
 
-    - name: Login using Playwright
-      env:
+          node playwright/login.js
 
-        APP_USERNAME: ${{ secrets.APP_USERNAME }}
 
-        APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
 
-      run: |
+      # Verify authentication file
 
-        node playwright/login.js
+      - name: Verify Playwright Session
+        run: |
 
+          ls -la
 
+          test -f auth.json
 
 
-    # Check Auth File
 
-    - name: Verify Authentication File
-      run: |
+      # -----------------------------
+      # Start OWASP ZAP
+      # -----------------------------
 
-        ls -la
+      - name: Start OWASP ZAP
+        run: |
 
-        cat auth.json
+          docker pull ghcr.io/zaproxy/zaproxy:stable
 
 
+          docker run -d \
+            --name zap \
+            --network host \
+            -v ${{ github.workspace }}:/zap/wrk \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap.sh \
+            -daemon \
+            -host 0.0.0.0 \
+            -port 8080 \
+            -config api.disablekey=true
 
 
-    # -----------------------------
-    # Start OWASP ZAP
-    # -----------------------------
 
-    - name: Start OWASP ZAP Container
-      run: |
+          echo "Waiting for ZAP..."
 
+          sleep 30
 
-        docker pull ghcr.io/zaproxy/zaproxy:stable
 
 
+      # -----------------------------
+      # Run ZAP Scan
+      # -----------------------------
 
-        docker run -d \
-          --name zap \
-          --network host \
-          -v ${{ github.workspace }}:/zap/wrk \
-          ghcr.io/zaproxy/zaproxy:stable \
-          zap.sh \
-          -daemon \
-          -host 0.0.0.0 \
-          -port 8080 \
-          -config api.disablekey=true
+      - name: Run ZAP Full Scan
+        run: |
 
+          docker exec zap \
+          zap-full-scan.py \
+          -t http://localhost:3000 \
+          -r /zap/wrk/zap-report.html \
+          -I
 
 
-        echo "Waiting for ZAP..."
 
-        sleep 30
+      # -----------------------------
+      # Upload Report
+      # -----------------------------
 
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v4
 
+        with:
 
-    # -----------------------------
-    # Run ZAP Scan
-    # -----------------------------
+          name: zap-authenticated-report
 
-    - name="Run OWASP ZAP Scan"
-      run: |
-
-
-        docker exec zap \
-        zap-full-scan.py \
-        -t http://localhost:3000 \
-        -r /zap/wrk/zap-report.html \
-        -I
-
-
-
-    # -----------------------------
-    # Upload Report
-    # -----------------------------
-
-    - name: Upload ZAP HTML Report
-
-      uses: actions/upload-artifact@v4
-
-      with:
-
-        name: zap-authenticated-report
-
-        path: zap-report.html
+          path: zap-report.html
