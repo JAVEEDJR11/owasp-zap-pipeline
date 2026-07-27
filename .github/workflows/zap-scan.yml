@@ -213,6 +213,38 @@ jobs:
           path: zap-auth-report.html
 
       ##########################################################
+      # Upload Authentication Screenshot
+      ##########################################################
+
+      - name: Upload Authentication Screenshot
+
+        uses: actions/upload-artifact@v4
+
+        if: always()
+
+        with:
+
+          name: authentication-proof
+
+          path: authentication-proof.png
+
+      ##########################################################
+      # Upload Basket Screenshot
+      ##########################################################
+
+      - name: Upload Basket Screenshot
+
+        uses: actions/upload-artifact@v4
+
+        if: always()
+
+        with:
+
+          name: basket-proof
+
+          path: basket-page.png           
+
+      ##########################################################
       # ZAP Logs (always)
       ##########################################################
 
