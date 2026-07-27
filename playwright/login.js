@@ -70,6 +70,23 @@ const { chromium } = require('playwright');
         // Wait for login to complete
         await page.waitForTimeout(5000);
 
+        // Check if login failed
+        const loginError = page.locator('text=Invalid email or password.');
+
+        if (await loginError.isVisible()) {
+        throw new Error("Login failed: Invalid email or password");
+        }
+
+        // Wait for the account button after successful login
+        await page.waitForSelector("#navbarAccount", {
+        timeout: 15000
+        });
+
+        console.log("======================================");
+        console.log("Authentication Successful");
+        console.log("Current URL:", page.url());
+        console.log("======================================");
+
         // Verify login
         await page.waitForSelector("#navbarAccount", {
             timeout: 15000
