@@ -1,51 +1,106 @@
 const { chromium } = require('playwright');
 
 (async () => {
+    let browser;
 
-    const browser = await chromium.launch({
+    try {
 
-        headless: true,
+        console.log("Launching Chromium through ZAP Proxy...");
 
-        proxy: {
-            server: 'http://localhost:8080'
+        browser = await chromium.launch({
+            headless: true,
+            proxy: {
+                server: "http://localhost:8080"
+            }
+        });
+
+        const context = await browser.newContext({
+            viewport: {
+                width: 1440,
+                height: 900
+            }
+        });
+
+        const page = await context.newPage();
+
+        console.log("Opening Juice Shop...");
+
+        await page.goto("http://localhost:3000", {
+            waitUntil: "domcontentloaded",
+            timeout: 60000
+        });
+
+        // Wait for page to settle
+        await page.waitForTimeout(5000);
+
+        // Close Welcome Banner
+        try {
+            await page.locator('button[aria-label="Close Welcome Banner"]').click({
+                timeout: 5000
+            });
+            console.log("Welcome banner closed.");
+        } catch {
+            console.log("Welcome banner not found.");
         }
 
-    });
+        // Close Cookie Banner
+        try {
+            await page.locator('a[aria-label="dismiss cookie message"]').click({
+                timeout: 5000
+            });
+            console.log("Cookie banner dismissed.");
+        } catch {
+            console.log("Cookie banner not found.");
+        }
 
-    const page = await browser.newPage();
+        console.log("Opening Login Page...");
 
-    await page.goto('http://localhost:3000');
+        await page.locator("#navbarAccount").click();
+        await page.locator("#navbarLoginButton").click();
 
-    await page.waitForTimeout(3000);
+        console.log("Entering credentials...");
 
-    // Close Welcome Banner
+        await page.locator("#email").fill(process.env.APP_USERNAME);
+        await page.locator("#password").fill(process.env.APP_PASSWORD);
 
-    try{
-        await page.locator('button[aria-label="Close Welcome Banner"]').click();
-    }catch{}
+        console.log("Logging in...");
 
-    // Close Cookie Dialog
+        await page.locator("#loginButton").click();
 
-    try{
-        await page.locator('a[aria-label="dismiss cookie message"]').click();
-    }catch{}
+        // Wait for login to complete
+        await page.waitForTimeout(5000);
 
-    // Login
+        // Verify login
+        await page.waitForSelector("#navbarAccount", {
+            timeout: 15000
+        });
 
-    await page.locator('#navbarAccount').click();
+        console.log("======================================");
+        console.log("Authentication Successful");
+        console.log("Current URL:", page.url());
+        console.log("======================================");
 
-    await page.locator('#navbarLoginButton').click();
+        // Save screenshot for GitHub Actions artifact
+        await page.screenshot({
+            path: "login-success.png",
+            fullPage: true
+        });
 
-    await page.locator('#email').fill(process.env.APP_USERNAME);
+        console.log("Screenshot saved.");
 
-    await page.locator('#password').fill(process.env.APP_PASSWORD);
+        await browser.close();
 
-    await page.locator('#loginButton').click();
+    } catch (err) {
 
-    await page.waitForTimeout(5000);
+        console.error("======================================");
+        console.error("Playwright Login Failed");
+        console.error(err);
+        console.error("======================================");
 
-    console.log("Authenticated Successfully");
+        if (browser) {
+            await browser.close();
+        }
 
-    await browser.close();
-
+        process.exit(1);
+    }
 })();
