@@ -80,13 +80,44 @@ const { chromium } = require('playwright');
         console.log("Current URL:", page.url());
         console.log("======================================");
 
-        // Save screenshot for GitHub Actions artifact
+        ////////////////////////////////////////////////////
+        // Authentication Proof Screenshot
+        ////////////////////////////////////////////////////
+
+        console.log("Opening Account Menu...");
+
+        await page.locator("#navbarAccount").click();
+
+        await page.waitForTimeout(2000);
+
         await page.screenshot({
-            path: "login-success.png",
+            path: "authentication-proof.png",
             fullPage: true
         });
 
-        console.log("Screenshot saved.");
+        console.log("Authentication screenshot saved.");
+
+        ////////////////////////////////////////////////////
+        // Basket Screenshot
+        ////////////////////////////////////////////////////
+
+        console.log("Opening Basket page...");
+
+        await page.goto("http://localhost:3000/#/basket", {
+            waitUntil: "domcontentloaded",
+            timeout: 60000
+        });
+
+        await page.waitForTimeout(3000);
+
+        console.log("Basket URL:", page.url());
+
+        await page.screenshot({
+            path: "basket-page.png",
+            fullPage: true
+        });
+
+        console.log("Basket screenshot saved.");
 
         await browser.close();
 
