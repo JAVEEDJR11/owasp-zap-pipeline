@@ -3,20 +3,20 @@ env:
     - name: JuiceShop
       urls:
         - http://localhost:3000
+      includePaths:
+        - http://localhost:3000.*
 
 jobs:
 
   - type: spider
     parameters:
       context: JuiceShop
-      user: ""
 
   - type: passiveScan-wait
 
   - type: activeScan
     parameters:
       context: JuiceShop
-      user: ""
 
   - type: report
     parameters:
