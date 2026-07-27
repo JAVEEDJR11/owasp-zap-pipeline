@@ -1,74 +1,80 @@
 name: OWASP ZAP Authenticated Scan
 
-
 on:
-
   workflow_dispatch:
 
-
-
 jobs:
-
-
-  zap-scan:
-
-
+  zap-auth:
     runs-on: ubuntu-latest
 
-
     steps:
+      - uses: actions/checkout@v4
 
+      - name: Start Juice Shop
+        run: |
+          docker run -d \
+            --name juice-shop \
+            -p 3000:3000 \
+            bkimminich/juice-shop
 
-    - name: Checkout
-      uses: actions/checkout@v4
+          echo "Waiting for Juice Shop..."
 
+          until curl -s http://localhost:3000 >/dev/null
+          do
+            sleep 5
+          done
 
+      - name: Start ZAP
+        run: |
+          docker run -d \
+            --name zap \
+            --network host \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap.sh \
+            -daemon \
+            -host 0.0.0.0 \
+            -port 8080 \
+            -config api.disablekey=true
 
-    - name: Start Juice Shop
-      run: |
+      - name: Wait for ZAP
+        run: |
+          until curl -s http://localhost:8080
+          do
+            sleep 5
+          done
 
-        docker run -d \
-          --name juice-shop \
-          -p 3000:3000 \
-          bkimminich/juice-shop
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium
 
-        sleep 30
+      - name: Login using Playwright
+        env:
+          APP_USERNAME: ${{ secrets.APP_USERNAME }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        run: |
+          node playwright/login.js
 
+      - name: Run Automation Framework
+        run: |
+          docker exec \
+            -v /tmp:/tmp \
+            zap \
+            zap.sh \
+            -cmd \
+            -autorun /zap/wrk/zap.yaml
 
-        curl http://localhost:3000
+      - name: Export Report
+        run: |
+          curl http://localhost:8080/OTHER/core/other/htmlreport/ \
+          -o zap-auth-report.html
 
-
-
-    - name: Run ZAP Authenticated Scan
-
-      env:
-
-        APP_USERNAME: ${{ secrets.APP_USERNAME }}
-
-        APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
-
-
-      run: |
-
-
-        docker run --rm \
-          --network host \
-          -v ${{ github.workspace }}:/zap/wrk \
-          -e APP_USERNAME \
-          -e APP_PASSWORD \
-          ghcr.io/zaproxy/zaproxy:stable \
-          zap.sh \
-          -autorun /zap/wrk/zap.yaml
-
-
-
-    - name: Upload ZAP Report
-
-      uses: actions/upload-artifact@v4
-
-      with:
-
-        name: zap-auth-report
-
-        path: zap-auth-report.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap-auth-report.html
