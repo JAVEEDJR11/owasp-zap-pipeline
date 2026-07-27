@@ -1,85 +1,25 @@
 env:
   contexts:
-
-    - name: juice-shop
-
+    - name: JuiceShop
       urls:
         - http://localhost:3000
 
-
-      authentication:
-
-        method: json
-
-        parameters:
-
-          loginPageUrl: http://localhost:3000/rest/user/login
-
-          loginRequestData: |
-            {
-              "email": "${username}",
-              "password": "${password}"
-            }
-
-
-      sessionManagement:
-
-        method: headers
-
-
-      users:
-
-        - name: zap-user
-
-          credentials:
-
-            username: ${APP_USERNAME}
-
-            password: ${APP_PASSWORD}
-
-
-
-      includePaths:
-
-        - http://localhost:3000/.*
-
-
-
 jobs:
 
-
   - type: spider
-
     parameters:
-
-      context: juice-shop
-
-      user: zap-user
-
-      maxDuration: 5
-
-
+      context: JuiceShop
+      user: ""
 
   - type: passiveScan-wait
 
-
-
   - type: activeScan
-
     parameters:
-
-      context: juice-shop
-
-      user: zap-user
-
-
+      context: JuiceShop
+      user: ""
 
   - type: report
-
     parameters:
-
       template: traditional-html
-
       reportDir: /zap/wrk
-
       reportFile: zap-auth-report.html
