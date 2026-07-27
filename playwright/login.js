@@ -14,19 +14,37 @@ const { chromium } = require('playwright');
 
     const page = await browser.newPage();
 
-    await page.goto("http://localhost:3000");
+    await page.goto('http://localhost:3000');
 
-    await page.locator("#navbarAccount").click();
+    await page.waitForTimeout(3000);
 
-    await page.locator("#navbarLoginButton").click();
+    // Close Welcome Banner
 
-    await page.locator("#email").fill(process.env.APP_USERNAME);
+    try{
+        await page.locator('button[aria-label="Close Welcome Banner"]').click();
+    }catch{}
 
-    await page.locator("#password").fill(process.env.APP_PASSWORD);
+    // Close Cookie Dialog
 
-    await page.locator("#loginButton").click();
+    try{
+        await page.locator('a[aria-label="dismiss cookie message"]').click();
+    }catch{}
+
+    // Login
+
+    await page.locator('#navbarAccount').click();
+
+    await page.locator('#navbarLoginButton').click();
+
+    await page.locator('#email').fill(process.env.APP_USERNAME);
+
+    await page.locator('#password').fill(process.env.APP_PASSWORD);
+
+    await page.locator('#loginButton').click();
 
     await page.waitForTimeout(5000);
+
+    console.log("Authenticated Successfully");
 
     await browser.close();
 
