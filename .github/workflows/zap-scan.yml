@@ -5,18 +5,21 @@ on:
 
 jobs:
   zap-authenticated-scan:
+
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      #################################################
+      ##########################################################
       # Start Juice Shop
-      #################################################
+      ##########################################################
 
       - name: Start Juice Shop
         run: |
+
           docker run -d \
             --name juice-shop \
             -p 3000:3000 \
@@ -29,18 +32,18 @@ jobs:
             sleep 5
           done
 
-          echo "Juice Shop is running."
+          echo "Juice Shop Started"
 
-      #################################################
+      ##########################################################
       # Start ZAP
-      #################################################
+      ##########################################################
 
-      - name: Start ZAP
+      - name: Start ZAP Daemon
         run: |
+
           docker run -d \
             --name zap \
             --network host \
-            -v ${{ github.workspace }}:/zap/wrk \
             ghcr.io/zaproxy/zaproxy:stable \
             zap.sh \
             -daemon \
@@ -48,61 +51,175 @@ jobs:
             -port 8080 \
             -config api.disablekey=true
 
+      ##########################################################
+      # Wait for ZAP
+      ##########################################################
+
       - name: Wait for ZAP
         run: |
+
           echo "Waiting for ZAP..."
 
-          until curl -s http://localhost:8080 > /dev/null
+          for i in {1..60}
           do
+            if curl -s http://localhost:8080 >/dev/null
+            then
+              echo "ZAP Ready"
+              exit 0
+            fi
+
             sleep 5
           done
 
-      #################################################
+          echo "ZAP failed to start"
+          docker logs zap
+
+          exit 1
+
+      ##########################################################
       # Install Node
-      #################################################
+      ##########################################################
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      #################################################
+      ##########################################################
       # Install Playwright
-      #################################################
+      ##########################################################
 
-      - name: Install Playwright
+      - name: Install Dependencies
+
         run: |
+
           npm init -y
+
           npm install playwright
+
           npx playwright install chromium
 
-      #################################################
+      ##########################################################
       # Login
-      #################################################
+      ##########################################################
 
-      - name: Login through ZAP
+      - name: Login using Playwright
+
         env:
+
           APP_USERNAME: ${{ secrets.APP_USERNAME }}
+
           APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+
         run: |
+
           node playwright/login.js
 
-      #################################################
-      # Run Automation Framework
-      #################################################
+      ##########################################################
+      # Spider
+      ##########################################################
 
-      - name: Run ZAP Automation
+      - name: Start Spider
+
         run: |
-          docker exec zap \
-          zap.sh \
-          -cmd \
-          -autorun /zap/wrk/zap.yaml
 
-      #################################################
-      # Upload Report
-      #################################################
+          curl "http://localhost:8080/JSON/spider/action/scan/?url=http://localhost:3000"
+
+      ##########################################################
+      # Wait Spider
+      ##########################################################
+
+      - name: Wait Spider
+
+        run: |
+
+          while true
+          do
+
+            STATUS=$(curl -s \
+            "http://localhost:8080/JSON/spider/view/status/" \
+            | jq -r '.status')
+
+            echo "Spider : $STATUS %"
+
+            if [ "$STATUS" = "100" ]
+            then
+              break
+            fi
+
+            sleep 5
+
+          done
+
+      ##########################################################
+      # Active Scan
+      ##########################################################
+
+      - name: Start Active Scan
+
+        run: |
+
+          curl "http://localhost:8080/JSON/ascan/action/scan/?url=http://localhost:3000"
+
+      ##########################################################
+      # Wait Active Scan
+      ##########################################################
+
+      - name: Wait Active Scan
+
+        run: |
+
+          while true
+          do
+
+            STATUS=$(curl -s \
+            "http://localhost:8080/JSON/ascan/view/status/" \
+            | jq -r '.status')
+
+            echo "Active Scan : $STATUS %"
+
+            if [ "$STATUS" = "100" ]
+            then
+              break
+            fi
+
+            sleep 10
+
+          done
+
+      ##########################################################
+      # Generate Report
+      ##########################################################
+
+      - name: Download HTML Report
+
+        run: |
+
+          curl \
+          http://localhost:8080/OTHER/core/other/htmlreport/ \
+          -o zap-auth-report.html
+
+      ##########################################################
+      # Upload
+      ##########################################################
 
       - name: Upload Report
+
         uses: actions/upload-artifact@v4
+
         with:
+
           name: zap-report
+
           path: zap-auth-report.html
+
+      ##########################################################
+      # ZAP Logs (always)
+      ##########################################################
+
+      - name: ZAP Logs
+
+        if: always()
+
+        run: |
+
+          docker logs zap
