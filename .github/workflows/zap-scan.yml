@@ -34,6 +34,29 @@ jobs:
 
           echo "Juice Shop Started"
 
+
+      ##########################################################
+      # Register Test User
+      ##########################################################
+
+      - name: Register Test User
+        run: |
+          echo "Registering test user..."
+
+          RESPONSE=$(curl -s -X POST http://localhost:3000/api/Users/ \
+            -H "Content-Type: application/json" \
+            -d '{
+              "email":"test@example.com",
+              "password":"test@12345",
+              "passwordRepeat":"test@12345",
+              "securityQuestion":{
+                "id":1,
+                "answer":"test"
+              }
+            }')
+
+          echo "$RESPONSE"
+          echo "Registration completed."
       ##########################################################
       # Start ZAP
       ##########################################################
