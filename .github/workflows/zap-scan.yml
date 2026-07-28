@@ -106,17 +106,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          
       ##########################################################
       # RUN PLay(Test)
       ##########################################################
       - name: Verify Login API
         run: |
            curl -s -X POST http://localhost:3000/rest/user/login \
-             -    H "Content-Type: application/json" \
-               -d '{
-                     "email":"test@example.com",
-                     "password":"test@12345"
-                   }'    
+           -H "Content-Type: application/json" \
+           -d '{"email":"test@example.com","password":"test@12345"}'
 
       ##########################################################
       # Install Playwright
