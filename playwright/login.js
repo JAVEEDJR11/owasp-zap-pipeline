@@ -52,11 +52,14 @@ const { chromium } = require('playwright');
         } catch {
             console.log("Cookie banner not found.");
         }
-
+        
         console.log("Opening Login Page...");
 
         await page.locator("#navbarAccount").click();
         await page.locator("#navbarLoginButton").click();
+
+        console.log("Username:", process.env.APP_USERNAME);
+        console.log("Password Length:", process.env.APP_PASSWORD ? process.env.APP_PASSWORD.length : 0);
 
         console.log("Entering credentials...");
 
